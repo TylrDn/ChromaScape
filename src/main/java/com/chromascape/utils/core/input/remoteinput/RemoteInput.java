@@ -137,7 +137,9 @@ public class RemoteInput implements AutoCloseable {
     }
 
     try {
-      return Native.load(binaryFile.toString(), RemoteInputInterface.class);
+      // JNA only skips its lib-name mangling (prepend "lib", append the platform extension) for
+      // absolute paths - a relative path here gets treated as a bare library name instead.
+      return Native.load(binaryFile.toAbsolutePath().toString(), RemoteInputInterface.class);
     } catch (UnsatisfiedLinkError e) {
       throw new RuntimeException("Unable to load RemoteInput binary from path", e);
     }

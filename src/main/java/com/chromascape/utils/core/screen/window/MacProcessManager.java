@@ -21,6 +21,14 @@ public class MacProcessManager implements ProcessManager {
   private static final String RUNELITE_MAIN_CLASS = "net.runelite.client.RuneLite";
 
   /**
+   * Path suffix of the native launcher binary inside the official RuneLite.app bundle. The bundle
+   * launches a Packr-wrapped native executable rather than a plain {@code java -cp ...} invocation,
+   * so {@link #RUNELITE_MAIN_CLASS} never appears in its command line or arguments - the executable
+   * path is the only reliable signal.
+   */
+  private static final String RUNELITE_APP_LAUNCHER_SUFFIX = "RuneLite.app/Contents/MacOS/RuneLite";
+
+  /**
    * To provide a macOS native way of grabbing and returning the Process ID of RuneLite. This is to
    * be used by RemoteInput.
    *
@@ -49,7 +57,8 @@ public class MacProcessManager implements ProcessManager {
 
   /**
    * Determines whether a given process is RuneLite by looking for its main class in the process's
-   * command line, then in its argument array as a fallback.
+   * command line, then in its argument array as a fallback, then by matching the official
+   * RuneLite.app launcher's executable path.
    *
    * @param handle The process to inspect
    * @return true if the process appears to be RuneLite, else false
@@ -61,8 +70,12 @@ public class MacProcessManager implements ProcessManager {
       return true;
     }
 
-    return info.arguments()
+    if (info.arguments()
         .map(args -> Arrays.stream(args).anyMatch(a -> a.contains(RUNELITE_MAIN_CLASS)))
-        .orElse(false);
+        .orElse(false)) {
+      return true;
+    }
+
+    return info.command().map(cmd -> cmd.endsWith(RUNELITE_APP_LAUNCHER_SUFFIX)).orElse(false);
   }
 }
