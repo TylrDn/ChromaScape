@@ -56,9 +56,8 @@ echo "Generating index files in $FONT_DIR..."
 for font_path in "$FONT_DIR"/*/; do
     font_name=$(basename "$font_path")
     echo "Writing index for \"$font_name\"..."
-    # List all .bmp filenames (basename only) into the index file
-    find "$font_path" -maxdepth 1 -name "*.bmp" -printf "%f\n" \
-        > "${font_path}${font_name}.index"
+    # -printf is GNU find-only; ls -1 is portable across macOS (BSD find) and Linux.
+    (cd "$font_path" && ls -1 *.bmp) > "${font_path}${font_name}.index"
 done
 
 echo "Done generating index files."
