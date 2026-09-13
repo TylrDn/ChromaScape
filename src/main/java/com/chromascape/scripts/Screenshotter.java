@@ -1,12 +1,15 @@
 package com.chromascape.scripts;
 
 import com.chromascape.base.BaseScript;
+import com.chromascape.utils.core.screen.topology.TemplateMatching;
+import com.chromascape.utils.core.screen.viewport.ViewportManager;
 import com.chromascape.utils.core.screen.window.ScreenManager;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import javax.imageio.ImageIO;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.bytedeco.opencv.opencv_core.Mat;
 
 /**
  * Creates screenshots of the client and stores it in an external folder "/output". Screenshots are
@@ -38,6 +41,10 @@ public class Screenshotter extends BaseScript {
       ImageIO.write(sc, "png", new File(ORIGINAL_IMAGE_PATH));
     } catch (Exception e) {
       logger.error(e.getMessage());
+    }
+    // Push the capture to the Debug View - Screenshotter otherwise never touches ViewportManager.
+    try (Mat mat = TemplateMatching.bufferedImageToMat(sc)) {
+      ViewportManager.getInstance().updateState(mat);
     }
     stop();
   }

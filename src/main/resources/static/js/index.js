@@ -1,10 +1,4 @@
 /**
- * Selected window mode for script execution ("Fixed" or "Resizable").
- * @type {string|null}
- */
-let selectedWindowMode = null;
-
-/**
  * Name of the script currently selected in the UI.
  * @type {string|null}
  */
@@ -49,7 +43,6 @@ async function initializeUI() {
         console.error("Failed to initialize scripts:", error);
     }
 
-    setupWindowModeDropdown();
     setupStartStopButton();
 }
 
@@ -99,7 +92,7 @@ async function fetchAndRenderScripts() {
 /**
  * Renders the script list in the sidebar and sets up selection highlighting.
  * Populates the 'script-list' unordered list element.
- * 
+ *
  * @param {string[]} scripts - List of script names to display.
  */
 function renderScriptList(scripts) {
@@ -136,24 +129,6 @@ function renderScriptList(scripts) {
 
             selectedScriptName = script;
             previouslySelectedElement = listItem;
-        });
-    });
-}
-
-// ----------------- WINDOW MODE -----------------
-
-/**
- * Sets up the dropdown for selecting window mode.
- * Updates the UI text and stores the selected value.
- * Listeners are attached to all elements with class 'dropdown-item'.
- */
-function setupWindowModeDropdown() {
-    document.querySelectorAll(".dropdown-item").forEach(item => {
-        item.addEventListener("click", e => {
-            e.preventDefault();
-            const dropdown = document.getElementById("windowModeDropdown");
-            dropdown.textContent = item.textContent;
-            selectedWindowMode = item.getAttribute("data-value");
         });
     });
 }
@@ -195,7 +170,7 @@ function connectLogWebSocket() {
  * Appends a single log line to the terminal output.
  * Parses the log data as JSON if possible to style by log level.
  * Auto-scrolls to the bottom if the user is near the end of the log.
- * 
+ *
  * @param {string} data - Raw log data string (JSON or plain text)
  */
 function appendLogLine(data) {
@@ -230,7 +205,7 @@ function appendLogLine(data) {
 /**
  * Updates the progress bar UI element.
  * Sets the text content and width of the progress bar.
- * 
+ *
  * @param {number|string} progress - Progress percentage (0-100)
  */
 function updateProgressBar(progress) {
@@ -288,12 +263,10 @@ function setupStartStopButton() {
 /**
  * Retrieves the configuration for running the selected script.
  * Validates that a script is selected.
- * 
+ *
  * @returns {{script: string}|null} Run configuration object with script name, or null if invalid.
  */
 function getRunConfig() {
-    const mode = document.getElementById("windowModeDropdown")?.textContent;
-
     if (!selectedScriptName) {
         alert("Please select a script.");
         return null;
@@ -305,7 +278,7 @@ function getRunConfig() {
 /**
  * Sends a POST request to start the selected script on the backend.
  * Triggers a page reload upon success to refresh state.
- * 
+ *
  * @param {object} config - Run configuration object containing script name.
  */
 async function startScript(config) {
