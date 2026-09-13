@@ -59,7 +59,14 @@ secrets.properties
 
 # custom user scripts
 /src/main/java/com/chromascape/scripts/*/
+# FORK DIVERGENCE — do not include in an upstream PR.
+# Upstream ignores script sub-folders so users' private scripts stay uncommitted. In this fork the
+# scripts ARE the deliverable and must be versioned. This re-includes every sub-folder.
+!/src/main/java/com/chromascape/scripts/*/
 /scripts/*/
+
+# VS Code Java extension build output
+/bin/
 
 # Ignore build directory, even though it was ignored before??
 /build/
