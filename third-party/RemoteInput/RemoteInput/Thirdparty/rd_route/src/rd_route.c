@@ -323,12 +323,16 @@ static kern_return_t _insert_jmp(void* where, void* to)
 #elif defined(__arm64__)
 #include <sys/mman.h>
 
-// Function to create an executable trampoline pointing to the target address
-static void* create_trampoline(void* to) {
+// Function to create an executable trampoline pointing to the target address.
+// `near_addr` is a placement hint so the trampoline lands within the +/-128MB
+// range an ARM64 B instruction can reach; mmap honours it on a best-effort basis.
+static void* create_trampoline(void* near_addr, void* to) {
     assert(to);
 
-    // Allocate an executable memory page
-    void* trampoline = mmap(NULL, 4096, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_ANON | MAP_PRIVATE | MAP_JIT, -1, 0);
+    // No MAP_JIT: the target process isn't hardened-runtime-signed, so a plain
+    // write-then-exec page (W^X respected via the mprotect below) works without
+    // needing the com.apple.security.cs.allow-jit entitlement.
+    void* trampoline = mmap(near_addr, 4096, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
     if (trampoline == MAP_FAILED) {
         perror("mmap");
         return NULL;
@@ -364,9 +368,9 @@ static kern_return_t _insert_jmp(void* where, void* to)
     int64_t offset = (int64_t)to - (int64_t)where;
 
     // Check if the offset is within ARM64 branch limits (+/-128MB)
-    /*if (offset < -33554432 || offset > 33554428) {
-        // Target address is out of range, create a trampoline
-        void* trampoline = create_trampoline(to);
+    if (offset < -33554432 || offset > 33554428) {
+        // Target address is out of range, create a trampoline near the patch site
+        void* trampoline = create_trampoline(where, to);
         if (!trampoline) {
             fprintf(stderr, "Failed to create trampoline\n");
             return KERN_FAILURE;
@@ -375,7 +379,15 @@ static kern_return_t _insert_jmp(void* where, void* to)
         // Update `to` to point to the trampoline
         to = trampoline;
         offset = (int64_t)to - (int64_t)where;
-    }*/
+
+        // mmap's placement hint is best-effort; verify the trampoline actually
+        // landed in range rather than silently encoding a truncated, wrong branch.
+        if (offset < -33554432 || offset > 33554428) {
+            fprintf(stderr, "Trampoline at %p is still out of branch range of %p\n", trampoline, where);
+            munmap(trampoline, 4096);
+            return KERN_FAILURE;
+        }
+    }
 
     // Calculate the signed 26-bit offset (in words) and encode in a branch instruction
     uint32_t branch_instruction = 0x14000000 | ((offset >> 2) & 0x03FFFFFF);
@@ -398,22 +410,31 @@ static kern_return_t _patch_memory(void *address, mach_msg_type_number_t count, 
 	assert(new_bytes);
 
 	kern_return_t kr = 0;
+	fprintf(stderr, "[ChromaScape-debug] _patch_memory: before=0x%08x\n", *(uint32_t*)address);
+
 	kr = mach_vm_protect(mach_task_self(), (mach_vm_address_t)address, (mach_vm_size_t)count, FALSE, VM_PROT_READ | VM_PROT_WRITE | VM_PROT_EXECUTE | VM_PROT_COPY);
 	if (kr != KERN_SUCCESS) {
 		RDErrorLog("mach_vm_protect() failed with error: 0x%x", kr);
 		return (kr);
 	}
+	fprintf(stderr, "[ChromaScape-debug] _patch_memory: after first protect, readback=0x%08x\n", *(uint32_t*)address);
 
 	kr = mach_vm_write(mach_task_self(), (mach_vm_address_t)address, (vm_offset_t)new_bytes, count);
 	if (kr != KERN_SUCCESS) {
 		RDErrorLog("mach_vm_write() failed with error: 0x%x", kr);
 		return (kr);
 	}
+	fprintf(stderr, "[ChromaScape-debug] _patch_memory: after write, in-process readback=0x%08x (expected=0x%08x)\n",
+		*(uint32_t*)address, *(uint32_t*)new_bytes);
 
-	kr = mach_vm_protect(mach_task_self(), (mach_vm_address_t)address, (mach_vm_size_t)count, FALSE, VM_PROT_READ | VM_PROT_EXECUTE);
+	// Keep VM_PROT_COPY here too: without it, restoring to READ|EXECUTE alone can
+	// cause the kernel to drop the private copy-on-write page created above and
+	// revert to the original (unmodified) shared/signed backing on next access.
+	kr = mach_vm_protect(mach_task_self(), (mach_vm_address_t)address, (mach_vm_size_t)count, FALSE, VM_PROT_READ | VM_PROT_EXECUTE | VM_PROT_COPY);
 	if (kr != KERN_SUCCESS) {
 		RDErrorLog("mach_vm_protect() failed with error: 0x%x", kr);
 	}
+	fprintf(stderr, "[ChromaScape-debug] _patch_memory: after restore protect, in-process readback=0x%08x\n", *(uint32_t*)address);
 
 	return (kr);
 }

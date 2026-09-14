@@ -5,6 +5,7 @@
 #include "Hook.hxx"
 #include <cassert>
 #include <cstring>
+#include <cstdio>
 
 #if defined(_WIN32) || defined(_WIN64)
 #include <windows.h>
@@ -82,10 +83,22 @@ Hook::Hook(void* original, void* detour) : original(original), detour(detour), t
 	kern_return_t kr = mach_vm_protect(mach_task_self(), reinterpret_cast<mach_vm_address_t>(original), size_of_jump, FALSE, VM_PROT_READ | VM_PROT_WRITE | VM_PROT_EXECUTE | VM_PROT_COPY);
 
     valid = kr == KERN_SUCCESS;
+    if (!valid)
+    {
+        fprintf(stderr, "[ChromaScape-debug] Hook ctor: initial mach_vm_protect failed with 0x%x for original=%p, hook install aborted\n", kr, original);
+    }
     if (valid)
 	{
 	    kr = mach_vm_read(mach_task_self(), reinterpret_cast<mach_vm_address_t>(original), size_of_jump, reinterpret_cast<vm_offset_t*>(&data[0]), &amount_read);
+	    if (kr != KERN_SUCCESS)
+	    {
+	        fprintf(stderr, "[ChromaScape-debug] Hook ctor: mach_vm_read failed with 0x%x for original=%p\n", kr, original);
+	    }
 	    kr = mach_vm_protect(mach_task_self(), reinterpret_cast<mach_vm_address_t>(original), size_of_jump, FALSE, VM_PROT_READ | VM_PROT_EXECUTE);
+	    if (kr != KERN_SUCCESS)
+	    {
+	        fprintf(stderr, "[ChromaScape-debug] Hook ctor: restore mach_vm_protect failed with 0x%x for original=%p\n", kr, original);
+	    }
 	}
 }
 
@@ -109,7 +122,12 @@ void Hook::apply()
 {
     if (valid)
     {
-        rd_route(original, detour, &trampoline);
+        int rd_route_result = rd_route(original, detour, &trampoline);
+        valid = rd_route_result == KERN_SUCCESS;
+        if (!valid)
+        {
+            fprintf(stderr, "rd_route failed with error 0x%x for hook at %p\n", rd_route_result, original);
+        }
     }
 }
 

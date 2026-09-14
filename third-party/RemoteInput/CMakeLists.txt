@@ -313,14 +313,20 @@ target_include_directories(${PROJECT_NAME} PRIVATE ${INCLUDE_DIRECTORIES})
 
 IF(PYTHON_BINDINGS)
     IF (USE_PYBIND11)
-        target_compile_definitions(${PROJECT_NAME} PRIVATE USE_DETOURS=1 HOOK_OPENGL_SWAP=1 HOOK_DIRECTX_BLIT=1 USE_PYBIND11=1 Py_BUILD_CORE=1 Py_NO_ENABLE_SHARED=1)
+        target_compile_definitions(${PROJECT_NAME} PRIVATE USE_DETOURS=1 HOOK_OPENGL_SWAP=1 HOOK_OPENGL_BLIT=1 HOOK_DIRECTX_BLIT=1 USE_PYBIND11=1 Py_BUILD_CORE=1 Py_NO_ENABLE_SHARED=1)
     ELSEIF(Py_LIMITED_API)
-        target_compile_definitions(${PROJECT_NAME} PRIVATE USE_DETOURS=1 HOOK_OPENGL_SWAP=1 HOOK_DIRECTX_BLIT=1 Py_LIMITED_API=${Py_LIMITED_API} Py_BUILD_CORE=1 Py_NO_ENABLE_SHARED=1)
+        target_compile_definitions(${PROJECT_NAME} PRIVATE USE_DETOURS=1 HOOK_OPENGL_SWAP=1 HOOK_OPENGL_BLIT=1 HOOK_DIRECTX_BLIT=1 Py_LIMITED_API=${Py_LIMITED_API} Py_BUILD_CORE=1 Py_NO_ENABLE_SHARED=1)
     ELSE()
-        target_compile_definitions(${PROJECT_NAME} PRIVATE USE_DETOURS=1 HOOK_OPENGL_SWAP=1 HOOK_DIRECTX_BLIT=1 Py_BUILD_CORE=1 Py_NO_ENABLE_SHARED=1)
+        target_compile_definitions(${PROJECT_NAME} PRIVATE USE_DETOURS=1 HOOK_OPENGL_SWAP=1 HOOK_OPENGL_BLIT=1 HOOK_DIRECTX_BLIT=1 Py_BUILD_CORE=1 Py_NO_ENABLE_SHARED=1)
     ENDIF()
 ELSE()
-    target_compile_definitions(${PROJECT_NAME} PRIVATE USE_DETOURS=1)
+    # FORK DIVERGENCE — HOOK_OPENGL_BLIT is checked by all three
+    # NativeHooks_*.cxx platform files but was never defined here, silently
+    # compiling out the entire OpenGL/CGL capture path (JavaNativeOGLBlit /
+    # mCGLFlushDrawable) on every platform. This is why capture came back
+    # solid black for any OpenGL-rendered content (e.g. RuneLite's LWJGL game
+    # viewport) regardless of the Java2D pipeline setting.
+    target_compile_definitions(${PROJECT_NAME} PRIVATE USE_DETOURS=1 HOOK_OPENGL_BLIT=1)
 ENDIF()
 
 IF(WIN32)

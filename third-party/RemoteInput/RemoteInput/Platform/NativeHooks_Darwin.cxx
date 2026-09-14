@@ -53,6 +53,12 @@ bool can_render(jint srctype, jint width, jint height)
 void JavaNativeBlit(JNIEnv *env, jobject self, jobject srcData, jobject dstData, jobject comp, jobject clip, jint srcx, jint srcy, jint dstx, jint dsty, jint width, jint height) noexcept
 {
     extern std::unique_ptr<ControlCenter> control_center;
+    static int debug_call_count = 0;
+    if (debug_call_count < 5)
+    {
+        debug_call_count++;
+        fprintf(stderr, "[ChromaScape-debug] JavaNativeBlit called: %dx%d can_render=%d\n", width, height, control_center ? can_render(-1, width, height) : -1);
+    }
     if (!control_center || !can_render(-1, width, height))
     {
         return native_hook->call<void, decltype(JavaNativeBlit)>(env, self, srcData, dstData, comp, clip, srcx, srcy, dstx, dsty, width, height);
@@ -221,6 +227,12 @@ void JavaNativeBlit(JNIEnv *env, jobject self, jobject srcData, jobject dstData,
 void JavaNativeOGLBlit(JNIEnv *env, void *oglc, jlong pSrcOps, jlong pDstOps, jboolean xform, jint hint, jint srctype, jboolean texture, jint sx1, jint sy1, jint sx2, jint sy2, jdouble dx1, jdouble dy1, jdouble dx2, jdouble dy2) noexcept
 {
     extern std::unique_ptr<ControlCenter> control_center;
+    static int debug_call_count = 0;
+    if (debug_call_count < 5)
+    {
+        debug_call_count++;
+        fprintf(stderr, "[ChromaScape-debug] JavaNativeOGLBlit called: %dx%d\n", (int)(sx2 - sx1), (int)(sy2 - sy1));
+    }
     if (control_center)
     {
         jint width = sx2 - sx1;
@@ -340,6 +352,13 @@ void JavaNativeOGLRenderQueueFlushBuffer(JNIEnv *env, jobject oglrq, jlong buf, 
     std::uint8_t* buffer = reinterpret_cast<uint8_t*>(buf);
     std::uint8_t* buffer_end = reinterpret_cast<uint8_t*>(buf) + limit;
 
+    static int debug_entry_count = 0;
+    if (debug_entry_count < 5)
+    {
+        debug_entry_count++;
+        fprintf(stderr, "[ChromaScape-debug] JavaNativeOGLRenderQueueFlushBuffer entered: limit=%d\n", limit);
+    }
+
     while(buffer < buffer_end)
     {
         jint opcode = NEXT_INT(buffer);
@@ -368,6 +387,13 @@ void JavaNativeOGLRenderQueueFlushBuffer(JNIEnv *env, jobject oglrq, jlong buf, 
                 jboolean isoblit  = EXTRACT_BOOLEAN(packedParams,
                                                     OFFSET_ISOBLIT);
 
+                static int debug_blit_count = 0;
+                if (debug_blit_count < 10)
+                {
+                    debug_blit_count++;
+                    fprintf(stderr, "[ChromaScape-debug] BLIT op: isoblit=%d sx1=%d sy1=%d sx2=%d sy2=%d\n", isoblit, sx1, sy1, sx2, sy2);
+                }
+
                 if (!isoblit)
                 {
                     jint srctype = EXTRACT_BYTE(packedParams, OFFSET_SRCTYPE);
@@ -377,6 +403,14 @@ void JavaNativeOGLRenderQueueFlushBuffer(JNIEnv *env, jobject oglrq, jlong buf, 
                 break;
 
             default:
+            {
+                static int debug_unhandled_count = 0;
+                if (debug_unhandled_count < 10)
+                {
+                    debug_unhandled_count++;
+                    fprintf(stderr, "[ChromaScape-debug] Unhandled opcode: %d\n", opcode);
+                }
+            }
                 break;
         }
     }
@@ -481,6 +515,13 @@ CGLError mCGLFlushDrawable(CGLContextObj ctx) noexcept
         GLint width = ViewPort[2] - ViewPort[0];
         GLint height = ViewPort[3] - ViewPort[1];
 
+        static int debug_call_count = 0;
+        if (debug_call_count < 5)
+        {
+            debug_call_count++;
+            fprintf(stderr, "[ChromaScape-debug] mCGLFlushDrawable called: %dx%d can_render=%d\n", width, height, can_render(-1, width, height));
+        }
+
         if (can_render(-1, width, height))
         {
             control_center->set_target_dimensions(width, height);
@@ -584,6 +625,7 @@ void InitialiseHooks() noexcept
     #if defined(USE_DETOURS)
         //Hook Native Blit
         void* blit = dlsym(RTLD_DEFAULT, "Java_sun_java2d_loops_Blit_Blit");
+        fprintf(stderr, "[ChromaScape-debug] Java_sun_java2d_loops_Blit_Blit = %p\n", blit);
         if (blit)
         {
             native_hook = std::make_unique<Hook>(reinterpret_cast<void*>(blit), reinterpret_cast<void*>(JavaNativeBlit));
@@ -593,6 +635,7 @@ void InitialiseHooks() noexcept
         //Hook OpenGL Blit
         #if defined(HOOK_OPENGL_BLIT)
         blit = dlsym(RTLD_DEFAULT, "OGLBlitLoops_Blit");
+        fprintf(stderr, "[ChromaScape-debug] OGLBlitLoops_Blit = %p\n", blit);
         if (blit)
         {
             opengl_blit_hook = std::make_unique<Hook>(reinterpret_cast<void*>(blit), reinterpret_cast<void*>(JavaNativeOGLBlit));
@@ -601,6 +644,7 @@ void InitialiseHooks() noexcept
         else
         {
             blit = dlsym(RTLD_DEFAULT, "Java_sun_java2d_opengl_OGLRenderQueue_flushBuffer");
+            fprintf(stderr, "[ChromaScape-debug] Java_sun_java2d_opengl_OGLRenderQueue_flushBuffer = %p\n", blit);
             if (blit)
             {
                 opengl_flush_buffer_hook = std::make_unique<Hook>(reinterpret_cast<void*>(blit), reinterpret_cast<void*>(JavaNativeOGLRenderQueueFlushBuffer));
@@ -611,6 +655,7 @@ void InitialiseHooks() noexcept
         if (!blit)
         {
             blit = dlsym(RTLD_DEFAULT, "CGLFlushDrawable");
+            fprintf(stderr, "[ChromaScape-debug] CGLFlushDrawable = %p\n", blit);
             opengl_blit_hook = std::make_unique<Hook>(reinterpret_cast<void*>(blit), reinterpret_cast<void*>(mCGLFlushDrawable));
             opengl_blit_hook->apply();
         }
