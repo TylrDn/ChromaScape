@@ -9,6 +9,8 @@ import java.io.File;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
+import java.util.Comparator;
 import javax.imageio.ImageIO;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -38,6 +40,12 @@ public final class Diagnostics {
   private static final String OUTPUT_DIR = "output/diagnostics";
   private static final DateTimeFormatter TIMESTAMP_FORMAT =
       DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss-SSS");
+
+  /**
+   * Upper bound on retained diagnostic screenshots. A flaky detector in a two-hour run can write
+   * thousands of frames; beyond this count the oldest are deleted after each new save.
+   */
+  private static final int MAX_RETAINED = 200;
 
   private Diagnostics() {}
 
@@ -90,8 +98,37 @@ public final class Diagnostics {
     try {
       ImageIO.write(capture, "png", file);
       logger.info("Saved diagnostic screenshot: {}", file.getPath());
+      pruneOldest(parent);
     } catch (IOException e) {
       logger.error("Failed to save diagnostic screenshot '{}': {}", file.getPath(), e.getMessage());
     }
+  }
+
+  /**
+   * Deletes the oldest {@code .png} files in {@code dir} until at most {@link #MAX_RETAINED}
+   * remain. Failures to delete are logged and otherwise ignored — pruning must never take down the
+   * script that triggered it.
+   *
+   * @param dir the diagnostics directory; a {@code null} or unreadable directory is a no-op
+   */
+  private static void pruneOldest(File dir) {
+    if (dir == null) {
+      return;
+    }
+    File[] files = dir.listFiles((d, name) -> name.endsWith(".png"));
+    if (files == null || files.length <= MAX_RETAINED) {
+      return;
+    }
+    Arrays.sort(files, Comparator.comparingLong(File::lastModified));
+    int excess = files.length - MAX_RETAINED;
+    int deleted = 0;
+    for (int i = 0; i < excess; i++) {
+      if (files[i].delete()) {
+        deleted++;
+      } else {
+        logger.warn("Could not prune diagnostic screenshot {}", files[i].getName());
+      }
+    }
+    logger.info("Pruned {} diagnostic screenshot(s); retaining at most {}", deleted, MAX_RETAINED);
   }
 }

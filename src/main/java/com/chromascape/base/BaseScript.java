@@ -35,16 +35,18 @@ public abstract class BaseScript {
    *
    * <p>Initializes the controller, logs start and stop events, then continuously invokes the {@link
    * #cycle()} method until the script is stopped. Checks for thread interruption and stops
-   * gracefully if detected.
+   * gracefully if detected. A failure during controller initialisation (e.g. the target client
+   * could not be found) is treated the same as a cycle failure: state is set to {@link
+   * BotState#ERROR} and the controller is still shut down cleanly.
    *
    * <p>This method blocks until completion.
    */
   public final void run() {
     scriptThread = Thread.currentThread();
-    controller.init();
-    StatisticsManager.reset();
-
     try {
+      controller.init();
+      StatisticsManager.reset();
+
       while (running) {
         StatisticsManager.incrementCycles();
         if (Thread.currentThread().isInterrupted()) {
@@ -66,6 +68,10 @@ public abstract class BaseScript {
           break;
         }
       }
+    } catch (Exception e) {
+      // controller.init() failed (e.g. target client not found) before the cycle loop started.
+      StateManager.setState(BotState.ERROR);
+      logger.error("Failed to initialise controller: {}", e.getMessage());
     } finally {
       logger.info("Stopping and cleaning up.");
       controller.shutdown();

@@ -19,17 +19,24 @@ import org.apache.logging.log4j.Logger;
  * template matching) never goes through this gate: a dry run should see exactly what a live run
  * would see, and only suppress the part that touches the client.
  *
- * <p>Enabled via the {@code chromascape.dryRun} system property (e.g. {@code -Dchromascape.dryRun
- * =true} on the {@code bootRun} invocation) so it can be flipped for a single development run
- * without a code change, or via {@link #setDryRun(boolean)} for a script that wants to force it
- * from {@code setup()}.
+ * <p><b>Dry-run is on by default.</b> Live input requires an explicit {@code
+ * -Dchromascape.dryRun=false} on the <em>application</em> JVM. A {@code -D} passed to {@code
+ * ./gradlew bootRun} reaches the Gradle daemon, not the forked application, unless {@code
+ * build.gradle.kts} forwards it — the {@code bootRun} block there does exactly that. The VS Code
+ * launch configurations set the property directly on the JVM they start. {@link
+ * #setDryRun(boolean)} can also flip it from {@code setup()}.
  */
 public final class ExecutionGate {
 
   private static final Logger logger = LogManager.getLogger(ExecutionGate.class);
   private static final String DRY_RUN_PROPERTY = "chromascape.dryRun";
 
-  private static volatile boolean dryRun = Boolean.getBoolean(DRY_RUN_PROPERTY);
+  /**
+   * Dry-run is the DEFAULT. Live input requires an explicit {@code -Dchromascape.dryRun=false} on
+   * the application JVM. Any other value, or no value at all, keeps the gate closed.
+   */
+  private static volatile boolean dryRun =
+      !"false".equalsIgnoreCase(System.getProperty(DRY_RUN_PROPERTY, "true"));
 
   private ExecutionGate() {}
 

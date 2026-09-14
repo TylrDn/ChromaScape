@@ -80,3 +80,29 @@ spotless {
 tasks.named("check") {
 	dependsOn("spotlessApply", "spotlessCheck", "checkstyleMain")
 }
+
+// FORK DIVERGENCE — do not include in an upstream PR.
+// Forward every chromascape.* switch to the application JVM. A -D on the gradle command line
+// only reaches the Gradle daemon; bootRun forks a new JVM that would not see it. Forwarding the
+// whole namespace (not one named key) is what stops the next flag from silently not applying —
+// chromascape.captureBridge shipped with exactly that bug after dryRun was fixed.
+// Default is dry-run (safe). Pass -Dchromascape.dryRun=false to send real input.
+tasks.named<org.springframework.boot.gradle.tasks.run.BootRun>("bootRun") {
+	System.getProperties()
+		.stringPropertyNames()
+		.filter { it.startsWith("chromascape.") }
+		.forEach { systemProperty(it, System.getProperty(it)) }
+	systemProperty(
+		"chromascape.dryRun",
+		providers.systemProperty("chromascape.dryRun").getOrElse("true"))
+}
+
+// FORK DIVERGENCE — tests never need a display; make that explicit so a headless CI or the
+// replay profile's own tests behave identically to a desktop run.
+tasks.test {
+	systemProperty("java.awt.headless", "true")
+	testLogging {
+		events("failed", "skipped")
+		exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+	}
+}

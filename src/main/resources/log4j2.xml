@@ -8,13 +8,30 @@
 
         <!-- Custom WebSocket appender -->
         <WebSocketLogAppender name="WebSocket"/>
+
+        <!-- FORK DIVERGENCE: persistent log file.
+             Console and WebSocket output evaporate when the terminal or browser closes; an
+             unattended run needs a record that survives. Path is relative to the working
+             directory (repository root), like every other runtime path. output/ is git-ignored.
+             OnStartupTriggeringPolicy rolls on every app start, so each session gets its own file. -->
+        <RollingFile name="File"
+                     fileName="output/logs/chromascape.log"
+                     filePattern="output/logs/chromascape-%d{yyyy-MM-dd}-%i.log.gz">
+            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"/>
+            <Policies>
+                <OnStartupTriggeringPolicy/>
+                <SizeBasedTriggeringPolicy size="10 MB"/>
+            </Policies>
+            <DefaultRolloverStrategy max="20"/>
+        </RollingFile>
     </Appenders>
 
     <Loggers>
-        <!-- Root logger sends logs to both console and WebSocket -->
+        <!-- Root logger: console + WebSocket (live view) + file (record) -->
         <Root level="info">
             <AppenderRef ref="Console"/>
             <AppenderRef ref="WebSocket"/>
+            <AppenderRef ref="File"/>
         </Root>
     </Loggers>
 </Configuration>
