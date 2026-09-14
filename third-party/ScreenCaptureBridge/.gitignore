@@ -1,0 +1,12 @@
+# Compiled Dynamic libraries
+*.dylib
+
+# SwiftPM build directory
+.build/
+.swiftpm/
+
+# Precompiled folder and binaries — negation disabled 2026-09-14 (L-14): binaries are committed
+# only at a recorded milestone after a fresh ./build.sh (the 01:30 UTC dylib predates the Swift
+# source at 02:18 UTC). Re-enable the two lines below when that milestone is in the register.
+# !/precompiled
+# !/precompiled/**
