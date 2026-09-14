@@ -39,7 +39,8 @@ dependencies {
 	annotationProcessor("org.apache.logging.log4j:log4j-core:2.24.3")
 
 	// Other libraries
-	implementation("com.github.kwhat:jnativehook:2.2.2")
+	// FORK DIVERGENCE — upstream declares com.github.kwhat:jnativehook:2.2.2 here; it is not
+	// referenced anywhere in src (the HotkeyListener it served no longer exists), so it is dropped.
 	implementation("commons-io:commons-io:2.14.0")
 	implementation("net.java.dev.jna:jna:5.13.0")
 	implementation("net.java.dev.jna:jna-platform:5.13.0")
@@ -77,8 +78,11 @@ spotless {
 	}
 }
 
+// FORK DIVERGENCE — `check` verifies formatting but never rewrites sources. Upstream wires
+// spotlessApply into check, so a plain `./gradlew check` mutated the tree; run
+// `./gradlew spotlessApply` yourself before committing instead.
 tasks.named("check") {
-	dependsOn("spotlessApply", "spotlessCheck", "checkstyleMain")
+	dependsOn("spotlessCheck", "checkstyleMain")
 }
 
 // FORK DIVERGENCE — do not include in an upstream PR.
