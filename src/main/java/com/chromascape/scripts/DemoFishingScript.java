@@ -173,6 +173,7 @@ public class DemoFishingScript extends BaseScript {
     if (clickLocation == null) {
       logger.error("clickLocation is null!");
       stop();
+      return; // FORK DIVERGENCE: stop() only requests a stop; without this, the null is clicked.
     }
     controller().mouse().moveTo(clickLocation, "medium");
     controller().mouse().leftClick();
