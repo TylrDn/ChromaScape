@@ -68,7 +68,7 @@ class ControllerInjectionRetryTest {
   }
 
   @Test
-  void aSingleAttemptBudgetNeverRetries() {
+  void singleAttemptBudgetNeverRetries() {
     AtomicInteger calls = new AtomicInteger();
     assertThrows(
         RuntimeException.class,

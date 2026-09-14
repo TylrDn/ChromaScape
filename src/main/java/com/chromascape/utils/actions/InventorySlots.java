@@ -24,6 +24,11 @@ import org.apache.logging.log4j.Logger;
  * a bare {@code boolean} so the caller still has {@code score} and {@code bounds} if it wants them,
  * and it logs score, bounds, slot index, and image path itself so that information exists even if
  * the caller never looks at the returned record.
+ *
+ * <p><b>Provenance note (2026-09-14):</b> the three {@code Demo*Script} classes cited above were
+ * removed from {@code com.chromascape.scripts} on 2026-09-14 (single-script environment decision);
+ * recoverable via {@code git log -- src/main/java/com/chromascape/scripts/Demo*.java} on commits at
+ * or before {@code 1343a61}.
  */
 public final class InventorySlots {
 

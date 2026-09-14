@@ -13,6 +13,7 @@ import com.chromascape.utils.core.screen.topology.MatchResult;
 import com.chromascape.utils.core.statistics.StatisticsManager;
 import java.awt.Rectangle;
 import java.util.List;
+import java.util.Map;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -70,6 +71,57 @@ public class IronPowerminer extends AbstractChromaScript {
   @Override
   protected List<String> requiredImages() {
     return List.of(IRON_ORE_IMAGE);
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * <p>Confirms the zones this script depends on actually resolved before the first {@link
+   * #cycle()} runs (delivery register M-3). {@link com.chromascape.foundation.CalibrationGate}, run
+   * by {@link com.chromascape.foundation.AbstractChromaScript#onFirstCycle()} just before this
+   * method, checks colour names and image existence only — it does not check that the inventory or
+   * chat UI templates matched against this frame. On a frame where they didn't, {@link
+   * com.chromascape.utils.domain.zones.ZoneManager#getInventorySlots()} and {@link
+   * com.chromascape.utils.domain.zones.ZoneManager#getChatTabs()} return {@code null}, and both
+   * {@link #isInventoryFull()} (this class, unguarded {@code .get(FULL_INVENTORY_SLOT)}) and {@link
+   * Idler#waitUntilIdle} (unguarded {@code .get("Latest Message")}, called every cycle) would throw
+   * an unhandled {@code NullPointerException} on the first cycle instead of a named halt.
+   */
+  @Override
+  protected void setup() {
+    verifyZonesResolved();
+  }
+
+  /**
+   * Halts with a named reason if the inventory slots or the chat tabs this script (directly, or via
+   * {@link Idler#waitUntilIdle}) depends on did not resolve. Logs the layout mode and, on success,
+   * which zones resolved, either way.
+   */
+  private void verifyZonesResolved() {
+    logger.info("Zone layout: {}", controller().zones().getIsFixed() ? "fixed" : "resizable");
+
+    List<Rectangle> slots = controller().zones().getInventorySlots();
+    if (slots == null || slots.size() <= FULL_INVENTORY_SLOT) {
+      haltAndStop(
+          "Inventory slots did not resolve (control panel template match failed on this frame) -"
+              + " got "
+              + (slots == null ? "null" : slots.size() + " slot(s)")
+              + ", need at least "
+              + (FULL_INVENTORY_SLOT + 1)
+              + ".");
+      return;
+    }
+    logger.info("Zones resolved: {} inventory slot(s)", slots.size());
+
+    Map<String, Rectangle> chatTabs = controller().zones().getChatTabs();
+    if (chatTabs == null || !chatTabs.containsKey("Latest Message")) {
+      haltAndStop(
+          "Chat zones did not resolve (chat template match failed on this frame) - "
+              + (chatTabs == null ? "chatTabs is null" : "no 'Latest Message' key")
+              + "; Idler.waitUntilIdle needs it every cycle.");
+      return;
+    }
+    logger.info("Zones resolved: chat tabs = {}", chatTabs.keySet());
   }
 
   @Override

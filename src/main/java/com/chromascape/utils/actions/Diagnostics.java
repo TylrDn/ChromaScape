@@ -28,6 +28,11 @@ import org.apache.logging.log4j.Logger;
  * it exists because the project's own checklist and the Phase 2 build order ask for it directly,
  * the same way the calibration and dry-run gates do.
  *
+ * <p><b>Provenance note (2026-09-14):</b> the {@code Demo*Script} classes cited above were removed
+ * from {@code com.chromascape.scripts} on 2026-09-14 (single-script environment decision);
+ * recoverable via {@code git log -- src/main/java/com/chromascape/scripts/Demo*.java} on commits at
+ * or before {@code 1343a61}.
+ *
  * <p>{@link StatisticsManager#incrementObjectsDetected()} is called here too, on every *successful*
  * detection — also requested, not evidenced; no demo touches {@code StatisticsManager} directly.
  * Only successes are counted, matching the checklist's own framing of the counter ("detection count

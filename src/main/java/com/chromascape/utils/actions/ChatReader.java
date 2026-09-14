@@ -15,6 +15,11 @@ import java.awt.Rectangle;
  * layer holds to. It's built anyway because item 5 of the build order asked for it explicitly —
  * flagged here the same way calibration and diagnostics are flagged as requested-not-evidenced,
  * rather than silently built as if the repetition existed.
+ *
+ * <p><b>Provenance note (2026-09-14):</b> {@code DemoFishingScript} was removed from {@code
+ * com.chromascape.scripts} on 2026-09-14 (single-script environment decision); recoverable via
+ * {@code git log -- src/main/java/com/chromascape/scripts/DemoFishingScript.java} on commits at or
+ * before {@code 1343a61}.
  */
 public final class ChatReader {
 

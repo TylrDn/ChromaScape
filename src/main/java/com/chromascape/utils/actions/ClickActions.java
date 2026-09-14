@@ -14,6 +14,12 @@ import java.awt.Point;
  * sometimes a literal and sometimes a parameter, and logging that appears before, after, or not at
  * all depending on the call site.
  *
+ * <p><b>Provenance note (2026-09-14):</b> the four {@code Demo*Script} classes cited above were
+ * removed from {@code com.chromascape.scripts} on 2026-09-14 (single-script environment decision);
+ * their source is recoverable via {@code git log --
+ * src/main/java/com/chromascape/scripts/Demo*.java} on commits at or before {@code 1343a61}. The
+ * citation stands as the Rule-6 evidence this class was built against.
+ *
  * <p>This class fixes three things those call sites didn't do consistently: it logs exactly once,
  * before acting, every time; it routes the actual click through {@link
  * ExecutionGate#execute(String, Runnable)} so dry-run mode suppresses it (per the project

@@ -16,6 +16,11 @@ import java.util.function.BooleanSupplier;
  * became true or because time ran out is indistinguishable to the caller. This utility returns a
  * {@code boolean} instead, so a call site can actually branch on "did the thing happen, or did I
  * give up."
+ *
+ * <p><b>Provenance note (2026-09-14):</b> {@code DemoFishingScript} and {@code DemoAgilityScript}
+ * were removed from {@code com.chromascape.scripts} on 2026-09-14 (single-script environment
+ * decision); recoverable via {@code git log -- src/main/java/com/chromascape/scripts/Demo*.java} on
+ * commits at or before {@code 1343a61}.
  */
 public final class BoundedWait {
 
