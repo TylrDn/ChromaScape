@@ -18,6 +18,7 @@ import com.chromascape.utils.domain.ocr.Ocr;
 import com.chromascape.utils.domain.walker.Walker;
 import com.chromascape.utils.domain.zones.ZoneManager;
 import java.time.Duration;
+import java.util.function.Supplier;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -47,6 +48,23 @@ public class Controller {
    * asynchronous; the zone manager needs real bounds before it can map anything.
    */
   private static final Duration CAPTUREKIT_FIRST_FRAME_TIMEOUT = Duration.ofSeconds(3);
+
+  /**
+   * Bounded retry for pairing RemoteInput with a just-found pid. Covers a transient race only: the
+   * process was found by {@link ProcessManagerFactory} but has not finished registering with EIOS
+   * yet, so {@code new RemoteInput(pid)} throws "Target Not Found" even though the pid is real.
+   * Observed twice for the same pid, about a minute apart, on 2026-09-13 ({@code
+   * output/logs/chromascape-2026-09-13-*.log.gz}). This does <b>not</b> address the injection route
+   * itself being unrecorded or reverted (C-4) or the dead RemoteInput frame hook (a separate,
+   * permanently refused subsystem) — see {@code docs/reference/macos-task-for-pid.md}.
+   */
+  private static final int PAIR_MAX_ATTEMPTS = 3;
+
+  /**
+   * Wait between pairing attempts. Not humanisation — a technical retry interval (Rule 5 does not
+   * apply; this never touches input or timing visible to the client).
+   */
+  private static final Duration PAIR_RETRY_BACKOFF = Duration.ofMillis(750);
 
   private ControllerState state;
 
@@ -146,8 +164,69 @@ public class Controller {
   private int pairRemoteInput() {
     logger.info("Setting up Remote Input Library...");
     int pid = ProcessManagerFactory.getProcessManager().getPid();
-    remoteInput = new RemoteInput(pid);
+    remoteInput =
+        retryWithBackoff(
+            "pair RemoteInput with pid " + pid,
+            PAIR_MAX_ATTEMPTS,
+            PAIR_RETRY_BACKOFF,
+            () -> new RemoteInput(pid));
     return pid;
+  }
+
+  /**
+   * Retries {@code attempt} up to {@code maxAttempts} times, sleeping {@code backoff} between
+   * attempts, with one structured {@code [INJECTION]} log line per attempt so a failure is
+   * traceable from the log alone, without reproducing it.
+   *
+   * <p>Package-private and generic in {@code T} purely so {@code ControllerInjectionRetryTest} can
+   * exercise the retry/backoff/logging behaviour with a fake {@link Supplier}, without a native
+   * library — {@link #pairRemoteInput()} is the only call site (Rule 6: not promoted beyond that
+   * until a second one exists).
+   *
+   * @param label what is being attempted, for the log lines
+   * @param maxAttempts total attempts, including the first; must be at least 1
+   * @param backoff sleep between a failed attempt and the next one; not applied after the last
+   * @param attempt the operation to retry; a {@link RuntimeException} counts as a failed attempt
+   * @return the first successful result
+   * @throws RuntimeException the exception from the final attempt, if every attempt failed
+   */
+  static <T> T retryWithBackoff(
+      String label, int maxAttempts, Duration backoff, Supplier<T> attempt) {
+    RuntimeException lastFailure = null;
+    for (int i = 1; i <= maxAttempts; i++) {
+      try {
+        T result = attempt.get();
+        if (i > 1) {
+          logger.info("[INJECTION] {} succeeded on attempt {}/{}", label, i, maxAttempts);
+        }
+        return result;
+      } catch (RuntimeException e) {
+        lastFailure = e;
+        logger.warn(
+            "[INJECTION] {} attempt {}/{} failed: {}", label, i, maxAttempts, e.getMessage());
+        if (i < maxAttempts) {
+          sleepQuietly(backoff);
+        }
+      }
+    }
+    logger.error(
+        "[INJECTION] {} gave up after {} attempt(s), {} apart. This is the C-4 route — see"
+            + " docs/reference/macos-task-for-pid.md \"Record the outcome here\": which JDK"
+            + " launched RuneLite, whether it was signed, RuneLite.app vs a plain java -jar"
+            + " launch, and any DYLD_INSERT_LIBRARIES preload. A bounded retry cannot fix an"
+            + " unrecorded or reverted route.",
+        label,
+        maxAttempts,
+        backoff);
+    throw lastFailure;
+  }
+
+  private static void sleepQuietly(Duration duration) {
+    try {
+      Thread.sleep(duration.toMillis());
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
   }
 
   /**
