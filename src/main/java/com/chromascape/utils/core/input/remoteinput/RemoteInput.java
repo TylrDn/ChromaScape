@@ -46,6 +46,20 @@ public class RemoteInput implements AutoCloseable {
   }
 
   /**
+   * FORK DIVERGENCE — do not include in an upstream PR.
+   *
+   * <p>Constructs a RemoteInput with no native library loaded and no target paired. Exists only so
+   * that {@code HeadlessRemoteInput} and {@code GuardedRemoteInput} (package {@code
+   * utils.core.input.guard}) can subclass this type and be handed to {@code VirtualMouseUtils} and
+   * {@code VirtualKeyboardUtils} unchanged. A subclass using this constructor must override every
+   * public method: the native interface field is {@code null} here.
+   */
+  protected RemoteInput() {
+    this.pid = -1;
+    this.remoteInput = null;
+  }
+
+  /**
    * The RI binary can be compiled on Linux, Mac and Windows. This function detects OS and applies
    * the corresponding filetype.
    *
