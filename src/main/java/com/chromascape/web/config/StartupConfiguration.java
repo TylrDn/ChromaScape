@@ -1,5 +1,6 @@
 package com.chromascape.web.config;
 
+import com.chromascape.foundation.RuntimeProfile;
 import com.chromascape.utils.core.runtime.profile.ProfileManager;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
@@ -31,6 +32,12 @@ public class StartupConfiguration {
     logger.info("CHROMASCAPE STARTUP CONFIGURATION RUNNING");
     logger.info("Initializing infrastructure...");
 
+    // FORK DIVERGENCE: the replay profile has no RuneLite install to configure.
+    if (!RuntimeProfile.fromSystemProperties().requiresClient()) {
+      logger.info("Replay profile: skipping RuneLite profile install");
+      logger.info("CHROMASCAPE STARTUP CONFIGURATION COMPLETED");
+      return;
+    }
     try {
       // Examples:
       // - Initialize native libraries (KInput)

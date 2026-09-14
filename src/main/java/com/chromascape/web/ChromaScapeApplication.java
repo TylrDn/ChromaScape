@@ -1,5 +1,6 @@
 package com.chromascape.web;
 
+import com.chromascape.foundation.RuntimeProfile;
 import com.chromascape.utils.core.screen.viewport.ViewportManager;
 import com.chromascape.utils.core.state.StateManager;
 import com.chromascape.web.logs.LogWebSocketHandler;
@@ -27,8 +28,13 @@ public class ChromaScapeApplication {
    * @param args command-line arguments passed to the application
    */
   public static void main(String[] args) {
-    // Disable headless mode to allow GUI components (e.g., MouseOverlay)
-    System.setProperty("java.awt.headless", "false");
+    // Disable headless mode to allow GUI components (e.g., MouseOverlay).
+    // FORK DIVERGENCE: the replay profile has no display, so it runs headless; every other
+    // profile keeps upstream's behaviour. An explicit -Djava.awt.headless on the JVM always wins.
+    if (System.getProperty("java.awt.headless") == null) {
+      boolean needsDisplay = RuntimeProfile.fromSystemProperties().requiresClient();
+      System.setProperty("java.awt.headless", needsDisplay ? "false" : "true");
+    }
     SpringApplication.run(ChromaScapeApplication.class, args);
   }
 

@@ -10,6 +10,7 @@
     <suppress files=".*Similarity\.java" checks=".*"/>
     <suppress files=".*WindMouse\.java" checks=".*"/>
     <suppress files=".*RemoteInputInterface\.java" checks=".*"/>
+    <suppress files=".*ScreenCaptureBridgeInterface\.java" checks=".*"/>
     <suppress files=".*TemplateMatching\.java" checks="AvoidStarImport"/>
     <suppress files=".*ColourContours\.java" checks="AvoidStarImport"/>
 </suppressions>

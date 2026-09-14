@@ -3,7 +3,10 @@ package com.chromascape.foundation;
 import com.chromascape.base.BaseScript;
 import com.chromascape.utils.actions.ClickActions;
 import com.chromascape.utils.core.runtime.exception.ScriptStoppedException;
+import com.chromascape.utils.core.screen.window.ScreenManager;
 import java.awt.Point;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -93,13 +96,19 @@ public abstract class AbstractChromaScript extends BaseScript {
    * {@inheritDoc}
    *
    * <p>Final. Runs the calibration gate against {@link #requiredColours()} and {@link
-   * #requiredImages()}, logs whether dry-run mode is active, then calls {@link #setup()}. A
-   * subclass extending {@link AbstractChromaScript} cannot override this method to skip any of that
-   * — it can only override {@link #setup()}.
+   * #requiredImages()}, logs whether dry-run mode is active and whether Discord alerts are
+   * configured, then calls {@link #setup()}. A subclass extending {@link AbstractChromaScript}
+   * cannot override this method to skip any of that — it can only override {@link #setup()}.
    */
   @Override
   protected final void onFirstCycle() {
     logger.info("Dry-run mode: {}", ExecutionGate.isDryRun() ? "ENABLED" : "disabled");
+    logger.info("Capture source: {}", ScreenManager.describeCaptureSource());
+    logger.info(
+        "Discord alerts: {}",
+        Files.exists(Path.of("secrets.properties"))
+            ? "configured"
+            : "NOT CONFIGURED — DiscordNotification.send() will silently no-op");
     CalibrationGate.check(requiredColours(), requiredImages());
     setup();
   }

@@ -1,25 +1,21 @@
 package com.chromascape.utils.core.screen.window;
 
-import com.chromascape.utils.core.input.remoteinput.RemoteInput;
-import com.sun.jna.Pointer;
+import com.chromascape.utils.core.screen.capture.CaptureSource;
 import java.awt.Rectangle;
-import java.awt.Transparency;
-import java.awt.color.ColorSpace;
 import java.awt.image.BufferedImage;
-import java.awt.image.ColorModel;
-import java.awt.image.ComponentColorModel;
-import java.awt.image.DataBuffer;
-import java.awt.image.DataBufferByte;
-import java.awt.image.Raster;
-import java.awt.image.WritableRaster;
 
 /**
  * Utility class for capturing screen regions and retrieving window bounds. Screen capture utilities
  * are intended to be used with colour contour extraction and template matching.
+ *
+ * <p>FORK DIVERGENCE — the pixel source is a pluggable {@link CaptureSource} set by the controller
+ * at start ({@link #setCaptureSource(CaptureSource)}) rather than a fixed RemoteInput buffer. The
+ * public capture API is unchanged; every perception utility keeps calling {@link #captureWindow()}
+ * and {@link #captureZone(Rectangle)} exactly as before.
  */
 public class ScreenManager {
 
-  private static RemoteInput remoteInput;
+  private static volatile CaptureSource source;
 
   /**
    * Captures a {@link Rectangle} region on the client screen, intended to be used when
@@ -27,6 +23,7 @@ public class ScreenManager {
    *
    * @param zone The rectangle area in client relative screen co-ordinates
    * @return A {@link BufferedImage} of the captured area
+   * @throws RuntimeException if no frame is available
    */
   public static BufferedImage captureZone(Rectangle zone) {
     BufferedImage screen = captureWindow();
@@ -41,72 +38,51 @@ public class ScreenManager {
    * maximised, minimised, partially or fully covered. This is to be used with template matching and
    * {@link com.chromascape.utils.core.screen.topology.ChromaObj} detection.
    *
-   * @return A {@link BufferedImage} of the client's screen
+   * @return A {@link BufferedImage} of the client's screen, or {@code null} if the source has no
+   *     frame yet
+   * @throws IllegalStateException if no capture source has been set (the controller has not run
+   *     {@code init()})
    */
   public static synchronized BufferedImage captureWindow() {
-    Rectangle dims = remoteInput.getTargetDimensions();
-    int width = dims.width;
-    int height = dims.height;
-
-    if (width <= 0 || height <= 0) {
-      return null;
-    }
-
-    Pointer currentScreenBuffer = remoteInput.getImageBuffer();
-    if (currentScreenBuffer == null) {
-      return null;
-    }
-
-    int bufferSize = width * height * 4;
-    byte[] data = currentScreenBuffer.getByteArray(0, bufferSize);
-
-    return createBufferedImage(data, width, height);
+    return requireSource().captureWindow();
   }
 
   /**
-   * Internal helper to create a buffered image from a C++ style byte array of pixels in BGRA
-   * format.
+   * Gets the bounds of the frame space the current capture source serves — for RemoteInput that is
+   * the RuneLite AWT canvas, for replay it is the fixture size.
    *
-   * @param pixels The byte array of pixel data in [B, G, R, A] format
-   * @param width The width of the client in pixels
-   * @param height The height of the client in pixels
-   * @return A {@link BufferedImage} representing the image
-   */
-  private static BufferedImage createBufferedImage(byte[] pixels, int width, int height) {
-    DataBufferByte buffer = new DataBufferByte(pixels, pixels.length);
-    WritableRaster raster =
-        Raster.createInterleavedRaster(
-            buffer, width, height, width * 4, 4, new int[] {2, 1, 0}, null);
-
-    ColorModel cm =
-        new ComponentColorModel(
-            ColorSpace.getInstance(ColorSpace.CS_sRGB),
-            new int[] {8, 8, 8},
-            false,
-            false,
-            Transparency.OPAQUE,
-            DataBuffer.TYPE_BYTE);
-
-    return new BufferedImage(cm, raster, false, null);
-  }
-
-  /**
-   * Gets the bounds of the (game view) RuneLite AWT Canvas object.
-   *
-   * @return A {@link Rectangle} representing the size of RuneLite's client area, excluding possible
-   *     window borders, title or scrollbars.
+   * @return A {@link Rectangle} with origin {@code (0, 0)} and the frame's width and height
+   * @throws IllegalStateException if no capture source has been set
    */
   public static Rectangle getWindowBounds() {
-    return remoteInput.getTargetDimensions();
+    return requireSource().getWindowBounds();
   }
 
   /**
-   * Sets the RemoteInput object in the ScreenManager, allowing it to access to the client's screen
-   * buffer.
+   * Installs the capture source every subsequent capture reads from.
    *
-   * @param remoteInput The {@link RemoteInput} object
+   * @param captureSource the source, or {@code null} to clear it at shutdown
    */
-  public static void setRemoteInput(RemoteInput remoteInput) {
-    ScreenManager.remoteInput = remoteInput;
+  public static void setCaptureSource(CaptureSource captureSource) {
+    source = captureSource;
+  }
+
+  /**
+   * Describes the active capture source for the startup banner.
+   *
+   * @return the source's own description, or {@code "none"} if no source is set
+   */
+  public static String describeCaptureSource() {
+    CaptureSource current = source;
+    return current == null ? "none" : current.describe();
+  }
+
+  private static CaptureSource requireSource() {
+    CaptureSource current = source;
+    if (current == null) {
+      throw new IllegalStateException(
+          "No CaptureSource is set: Controller.init() has not run, or shutdown() cleared it");
+    }
+    return current;
   }
 }
